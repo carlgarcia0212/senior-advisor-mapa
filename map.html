@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mapa Senior Advisor</title>
+  <meta charset="utf-8">
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"></script>
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: Arial, sans-serif; }
+    #map { height: 100%; width: 100%; }
+    #info-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; padding: 15px;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      display: none; max-height: 40%; z-index: 999;
+    }
+    .info-card { display: flex; align-items: center; gap: 12px; }
+    .info-card img {
+      width: 80px; height: 80px; object-fit: cover; border-radius: 8px;
+    }
+    .info-text { flex: 1; }
+    .info-text h3 { margin: 5px 0; font-size: 18px; }
+    .info-text p { margin: 3px 0; font-size: 14px; color: #555; }
+    .btn {
+      display: block; margin-top: 10px; padding: 10px;
+      background: #1976d2; color: #fff;
+      text-align: center; text-decoration: none;
+      border-radius: 6px; font-weight: bold; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <div id="info-content"></div>
+  </div>
+
+  <script>
+    async function initMap() {
+      const map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 12,
+        center: { lat: -33.45, lng: -70.65 }
+      });
+
+      // Ubicación actual
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(pos => {
+          const userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          new google.maps.Marker({
+            position: userPos,
+            map,
+            icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+          });
+          map.setCenter(userPos);
+        });
+      }
+
+      // Cargar residencias
+      const response = await fetch("residencias.json");
+      const hogares = await response.json();
+
+      const infoPanel = document.getElementById("info-panel");
+      const infoContent = document.getElementById("info-content");
+
+      hogares.forEach(hogar => {
+        if (!hogar.latitud_google || !hogar.longitud_google) return;
+
+        const marker = new google.maps.Marker({
+          position: { lat: hogar.latitud_google, lng: hogar.longitud_google },
+          map,
+          title: hogar.nombre_residencia
+        });
+
+        marker.addListener("click", () => {
+          infoContent.innerHTML = `
+            <div class="info-card">
+              ${hogar.imagen_1 ? `<img src="${hogar.imagen_1}" alt="${hogar.nombre_residencia}">` : ""}
+              <div class="info-text">
+                <h3>${hogar.nombre_residencia}</h3>
+                <p>${hogar.comuna || ""}</p>
+              </div>
+            </div>
+            <div class="btn" onclick="guardarSeleccion('${hogar.place_id}')">Guardar selección</div>
+          `;
+          infoPanel.style.display = "block";
+        });
+      });
+    }
+
+    // Guardar selección en Adalo
+    async function guardarSeleccion(place_id) {
+      try {
+        const res = await fetch("https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer 6sf063he4vxtqvsamoica6tbt",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ place_id })
+        });
+
+        const data = await res.json();
+        console.log("Guardado en Adalo ✅", data);
+        alert("✅ Selección guardada en Adalo");
+      } catch (err) {
+        console.error("Error guardando en Adalo ❌", err);
+        alert("❌ Error guardando en Adalo");
+      }
+    }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
+
+
+
