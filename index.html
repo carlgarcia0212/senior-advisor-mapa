@@ -7,47 +7,16 @@
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
-    #info-panel {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: #fff; padding: 12px 14px;
-      border-radius: 12px 12px 0 0;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.18);
-      display: none; max-height: 40%; z-index: 9999;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .info-card { display: flex; align-items: center; gap: 12px; }
-    .info-card img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
-    .info-text { flex: 1; }
-    .info-text h3 { margin: 0 0 4px; font-size: 18px; }
-    .info-text p { margin: 0; font-size: 14px; color: #555; }
-    .btn { display: inline-block; margin-top: 10px; padding: 10px 12px; background: #1976d2; color: #fff; border-radius: 6px; text-decoration:none; cursor:pointer; font-weight:600; }
-    #error { position: fixed; top: 12px; left: 12px; background:#d32f2f; color:#fff; padding:6px 10px; border-radius:6px; display:none; z-index:10000; }
   </style>
-
-  <!-- Google Maps JS API (usa la misma forma que ya te funcionó sin callback) -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"></script>
 </head>
 <body>
   <div id="map"></div>
 
-  <div id="info-panel">
-    <div id="info-content"></div>
-  </div>
-  <div id="error"></div>
-
   <script>
-    // CONFIG: URL del JSON y endpoint Adalo
     const JSON_URL = "https://carlgarcia0212.github.io/senior-advisor-mapa/residencias.json";
     const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
     const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
-
-    function showError(msg) {
-      const el = document.getElementById('error');
-      el.innerText = msg;
-      el.style.display = 'inline-block';
-      console.error(msg);
-      setTimeout(()=> el.style.display = 'none', 6000);
-    }
 
     function toNum(v) {
       const n = (typeof v === 'number') ? v : parseFloat(v);
@@ -65,24 +34,17 @@
           fillOpacity: 1,
           strokeColor: '#fff',
           strokeWeight: 2
-        },
-        title: 'Tu ubicación'
+        }
       });
     }
 
     async function initMap() {
-      let map;
-      try {
-        map = new google.maps.Map(document.getElementById('map'), {
-          center: { lat: -33.45, lng: -70.65 },
-          zoom: 12
-        });
-      } catch (e) {
-        showError("Google Maps no inicializó: " + e.message);
-        return;
-      }
+      let map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -33.45, lng: -70.65 },
+        zoom: 12
+      });
 
-      // fallback: si preview no da geoloc, no rompas la ejecución
+      // ubicación actual (si está disponible)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -90,89 +52,46 @@
             addUserDot(map, userPos);
             map.setCenter(userPos);
           },
-          (err) => {
-            console.warn("Geoloc no disponible o denegada:", err);
-            // no mostramos error al usuario para no molestar en preview
-          },
+          () => {}, // silencioso
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
         );
       }
 
-      // carga residencias
-      let hogares = [];
+      // cargar residencias
       try {
         const resp = await fetch(JSON_URL, { cache: 'no-store' });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        hogares = await resp.json();
-        console.log('Residencias cargadas:', hogares.length);
+        if (!resp.ok) return;
+        const hogares = await resp.json();
+
+        hogares.forEach(hogar => {
+          const lat = toNum(hogar.latitud_google);
+          const lng = toNum(hogar.longitud_google);
+          if (lat === null || lng === null) return;
+
+          const marker = new google.maps.Marker({
+            position: { lat, lng },
+            map,
+            title: hogar.nombre_residencia || ''
+          });
+
+          marker.addListener('click', () => guardarSeleccionSilenciosa(hogar));
+        });
       } catch (e) {
-        showError('Error cargando residencias.json: ' + e.message);
-        return;
+        // sin mensajes
       }
-
-      const infoPanel = document.getElementById('info-panel');
-      const infoContent = document.getElementById('info-content');
-
-      // crear markers
-      hogares.forEach(hogar => {
-        const lat = toNum(hogar.latitud_google);
-        const lng = toNum(hogar.longitud_google);
-        if (lat === null || lng === null) return;
-
-        const marker = new google.maps.Marker({
-          position: { lat, lng },
-          map,
-          title: hogar.nombre_residencia || ''
-        });
-
-        marker.addListener('click', () => {
-          // panel con imagen a la izquierda, texto a la derecha
-          const imgHtml = hogar.imagen_1 ? `<img src="${hogar.imagen_1}" alt="${hogar.nombre_residencia}">` : `<div style="width:80px;height:80px;border-radius:8px;background:#eee;display:flex;align-items:center;justify-content:center;color:#999">No Img</div>`;
-          const safeName = (hogar.nombre_residencia||'').replace(/"/g,'&quot;');
-          const safeComuna = (hogar.comuna||'').replace(/"/g,'&quot;');
-
-          infoContent.innerHTML = `
-            <div class="info-card">
-              ${imgHtml}
-              <div class="info-text">
-                <h3>${safeName}</h3>
-                <p>${safeComuna}</p>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;">
-              <div class="btn" id="btn-guardar">Guardar selección</div>
-              <a class="btn" id="btn-listado" style="background:#4caf50">Ver en listado</a>
-            </div>
-          `;
-          infoPanel.style.display = 'block';
-
-          // Handler guardar
-          document.getElementById('btn-guardar').onclick = () => guardarSeleccionCompleta(hogar);
-
-          // Handler ver en listado: redirige al preview de Adalo pasando nombre_residencia como parametro
-          document.getElementById('btn-listado').onclick = () => {
-            const appId = '46b15754-5dde-409c-a825-90185f48da2c';
-            const target = '2l4khc77kz1tbkolr7uch5jqi'; // reemplaza por el target ID real de "Listado Completo" si es distinto
-            const params = encodeURIComponent(JSON.stringify({ query_nombre: hogar.nombre_residencia || '' }));
-            // Usamos window.location.href para abrir adalo preview con params
-            window.location.href = `https://previewer.adalo.com/${appId}?target=${target}&params=${params}`;
-          };
-        });
-      });
     }
 
-    // Guarda completo en Seleccionesmapa (payload con varios campos)
-    async function guardarSeleccionCompleta(hogar) {
+    // Guardar automático sin mostrar mensajes
+    async function guardarSeleccionSilenciosa(hogar) {
       const payload = {
         place_id: hogar.place_id || "",
         nombre_residencia: hogar.nombre_residencia || "",
         comuna: hogar.comuna || "",
         imagen_url: hogar.imagen_1 || ""
-        // Añade otros campos si tu colección los tiene
       };
 
       try {
-        const res = await fetch(ADALO_API_URL, {
+        await fetch(ADALO_API_URL, {
           method: "POST",
           headers: {
             "Authorization": "Bearer " + ADALO_BEARER,
@@ -180,27 +99,17 @@
           },
           body: JSON.stringify(payload)
         });
-
-        const text = await res.text();
-        if (!res.ok) {
-          console.error("Adalo API error:", res.status, text);
-          showError("Error guardando en Adalo: " + res.status + " — " + text);
-          return;
-        }
-        const data = JSON.parse(text);
-        console.log("Guardado OK:", data);
-        alert("✅ Selección guardada");
+        // nada de alerts ni logs
       } catch (err) {
-        console.error("Error guardando en Adalo:", err);
-        showError("Error guardando en Adalo: " + err.message);
+        // nada de alerts ni logs
       }
     }
 
-    // inicializa todo
     window.onload = initMap;
   </script>
 </body>
 </html>
+
 
 
 
