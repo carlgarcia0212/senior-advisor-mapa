@@ -63,6 +63,8 @@
         if (!resp.ok) return;
         const hogares = await resp.json();
 
+        let marcadorSeleccionado = null;
+
         hogares.forEach(hogar => {
           const lat = toNum(hogar.latitud_google);
           const lng = toNum(hogar.longitud_google);
@@ -74,7 +76,26 @@
             title: hogar.nombre_residencia || ''
           });
 
-          marker.addListener('click', () => guardarSeleccionSilenciosa(hogar));
+          marker.addListener('click', () => {
+            // Restaurar marcador anterior
+            if (marcadorSeleccionado) {
+              marcadorSeleccionado.setIcon(null);
+            }
+
+            // Cambiar color del marcador seleccionado
+            marker.setIcon({
+              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              scale: 5,
+              fillColor: '#00e7ff',
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 2
+            });
+
+            marcadorSeleccionado = marker;
+
+            guardarSeleccionSilenciosa(hogar);
+          });
         });
       } catch (e) {
         // sin mensajes
@@ -99,9 +120,8 @@
           },
           body: JSON.stringify(payload)
         });
-        // nada de alerts ni logs
       } catch (err) {
-        // nada de alerts ni logs
+        // silencioso
       }
     }
 
@@ -109,6 +129,7 @@
   </script>
 </body>
 </html>
+
 
 
 
