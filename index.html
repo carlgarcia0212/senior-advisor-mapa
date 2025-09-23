@@ -1,126 +1,136 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Senior Advisor - Mapa</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mapa Senior Advisor</title>
   <style>
-    #map {
-      height: 80vh;
-      width: 100%;
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
     }
-    #debug {
-      padding: 10px;
-      font-family: monospace;
-      background: #f9f9f9;
-      border-top: 1px solid #ccc;
-      font-size: 12px;
+
+    #map {
+      width: 100%;
+      height: 100vh;
     }
   </style>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"></script>
 </head>
 <body>
   <div id="map"></div>
-  <div id="debug">Cargando mapa...</div>
 
   <script>
-    const API_ADALO = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c";
-    const COLLECTION_NAME = "t_7slnxztk4hwnn9l2wtk2hxw0y"; // ID real de tu colección
-    const TOKEN_ADALO = "Bearer 6sf063he4vxtqvsamoica6tbt";
+    const JSON_URL = "https://carlgarcia0212.github.io/senior-advisor-mapa/residencias.json";
+    const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
+    const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
 
-    const lugares = [
-      { nombre: "Residencia Las Rosas", lat: -33.45694, lng: -70.64827, place_id: "residencia_las_rosas" },
-      { nombre: "Residencia Santa María", lat: -33.45789, lng: -70.64671, place_id: "residencia_santa_maria" }
-    ];
+    function toNum(v) {
+      const n = (typeof v === 'number') ? v : parseFloat(v);
+      return Number.isFinite(n) ? n : null;
+    }
 
-    const debug = (msg) => {
-      const debugBox = document.getElementById("debug");
-      debugBox.innerHTML += `<br>🧪 ${msg}`;
-      console.log(msg);
-    };
-
-    const obtenerUsuario = async (userId) => {
-      debug("Buscando username...");
-      const res = await fetch(`${API_ADALO}/collections/users/${userId}`, {
-        headers: { Authorization: TOKEN_ADALO }
+    function addUserDot(map, pos) {
+      new google.maps.Marker({
+        position: pos,
+        map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 6,
+          fillColor: '#1a73e8',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2
+        }
       });
-      const data = await res.json();
-      debug("Usuario detectado: " + (data.username || "sin username"));
-      return data.username;
-    };
+    }
 
-    const guardarSeleccion = async (residencia, username) => {
-      const body = {
-        place_id: residencia.place_id,
-        nombre_residencia: residencia.nombre,
-        username_logueado: username,
-        timestamp: new Date().toISOString()
-      };
+    let lastSelectedMarker = null;
 
-      const res = await fetch(`${API_ADALO}/collections/${COLLECTION_NAME}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: TOKEN_ADALO
-        },
-        body: JSON.stringify(body)
+    async function initMap() {
+      let map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -33.45, lng: -70.65 },
+        zoom: 12
       });
 
-      if (res.ok) {
-        debug("✅ Registro guardado en Adalo.");
-      } else {
-        debug("❌ Error al guardar. " + (await res.text()));
-      }
-    };
-
-    const iniciarMapa = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      let userId = urlParams.get("user_id");
-      debug("user_id en URL: " + userId);
-
-      if (!userId) {
-        debug("❌ No se encontró el parámetro 'user_id' en la URL.");
-        return;
+      // ubicación actual
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            addUserDot(map, userPos);
+            map.setCenter(userPos);
+          },
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+        );
       }
 
-      let username = "";
+      // cargar residencias
       try {
-        username = await obtenerUsuario(userId);
+        const resp = await fetch(JSON_URL, { cache: 'no-store' });
+        if (!resp.ok) return;
+        const hogares = await resp.json();
+
+        hogares.forEach(hogar => {
+          const lat = toNum(hogar.latitud_google);
+          const lng = toNum(hogar.longitud_google);
+          if (lat === null || lng === null) return;
+
+          const marker = new google.maps.Marker({
+            position: { lat, lng },
+            map,
+            title: hogar.nombre_residencia || '',
+            icon: {
+              url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+            }
+          });
+
+          marker.addListener('click', () => {
+            // resetear anterior
+            if (lastSelectedMarker) {
+              lastSelectedMarker.setIcon("http://maps.google.com/mapfiles/ms/icons/red-dot.png");
+            }
+            // marcar este como activo
+            marker.setIcon("http://maps.google.com/mapfiles/ms/icons/green-dot.png");
+            lastSelectedMarker = marker;
+
+            guardarSeleccionSilenciosa(hogar);
+          });
+        });
+
       } catch (e) {
-        debug("❌ Error al obtener usuario.");
-        return;
+        // sin mensajes
       }
+    }
 
-      const map = new google.maps.Map(document.getElementById("map"), {
-        zoom: 14,
-        center: { lat: lugares[0].lat, lng: lugares[0].lng }
-      });
-
-      lugares.forEach((residencia) => {
-        const marker = new google.maps.Marker({
-          position: { lat: residencia.lat, lng: residencia.lng },
-          map,
-          title: residencia.nombre
+    async function guardarSeleccionSilenciosa(hogar) {
+      const payload = {
+        place_id: hogar.place_id || "",
+        nombre_residencia: hogar.nombre_residencia || "",
+        comuna: hogar.comuna || "",
+        imagen_url: hogar.imagen_1 || ""
+      };
+      try {
+        await fetch(ADALO_API_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + ADALO_BEARER,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
         });
+      } catch (err) {
+        // silencioso
+      }
+    }
 
-        marker.addListener("click", () => {
-          debug("📍 Clic en " + residencia.nombre);
-          guardarSeleccion(residencia, username);
-        });
-      });
-
-      debug("🟢 Mapa inicializado.");
-    };
-
-    // Forzar inicio del mapa
-    window.onload = iniciarMapa;
+    window.onload = initMap;
   </script>
-
-  <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"
-    async
-    defer
-  ></script>
 </body>
 </html>
+
 
 
 
