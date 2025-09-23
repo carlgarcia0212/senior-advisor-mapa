@@ -16,14 +16,31 @@
   <script>
     const JSON_URL = "https://carlgarcia0212.github.io/senior-advisor-mapa/residencias.json";
     const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
+    const ADALO_USERS_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/users";
     const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
 
     const urlParams = new URLSearchParams(window.location.search);
-    const username = urlParams.get("username");
+    const userId = urlParams.get("user_id");
 
-    if (!username) {
-      alert("No estás logueado. Debes acceder desde la app.");
-      throw new Error("Username no disponible");
+    if (!userId) {
+      alert("No se detectó el usuario logueado.");
+      throw new Error("Falta user_id");
+    }
+
+    let userData = null;
+
+    async function obtenerUsuario(userId) {
+      const response = await fetch(`${ADALO_USERS_URL}/${userId}`, {
+        headers: {
+          "Authorization": "Bearer " + ADALO_BEARER
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("No se pudo obtener el usuario desde la API de Adalo.");
+      }
+
+      return await response.json();
     }
 
     function toNum(v) {
@@ -46,7 +63,39 @@
       });
     }
 
+    async function guardarSeleccion(hogar) {
+      const payload = {
+        place_id: hogar.place_id || "",
+        nombre_residencia: hogar.nombre_residencia || "",
+        comuna: hogar.comuna || "",
+        imagen_url: hogar.imagen_1 || "",
+        username_logueado: userData.username || "", // campo tipo texto
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        await fetch(ADALO_API_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + ADALO_BEARER,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        console.log("✅ Guardado:", payload);
+      } catch (err) {
+        console.error("❌ Error al guardar:", err);
+      }
+    }
+
     async function initMap() {
+      try {
+        userData = await obtenerUsuario(userId);
+      } catch (e) {
+        alert("Error al autenticar al usuario.");
+        return;
+      }
+
       let map = new google.maps.Map(document.getElementById('map'), {
         center: { lat: -33.45, lng: -70.65 },
         zoom: 12
@@ -97,37 +146,11 @@
             });
 
             marcadorSeleccionado = marker;
-
             guardarSeleccion(hogar);
           });
         });
       } catch (e) {
-        // silencioso
-      }
-    }
-
-    async function guardarSeleccion(hogar) {
-      const payload = {
-        place_id: hogar.place_id || "",
-        nombre_residencia: hogar.nombre_residencia || "",
-        comuna: hogar.comuna || "",
-        imagen_url: hogar.imagen_1 || "",
-        username_logueado: username,
-        timestamp: new Date().toISOString()
-      };
-
-      try {
-        await fetch(ADALO_API_URL, {
-          method: "POST",
-          headers: {
-            "Authorization": "Bearer " + ADALO_BEARER,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-        console.log("Guardado:", payload);
-      } catch (err) {
-        console.error("Error al guardar:", err);
+        console.error("Error cargando residencias:", e);
       }
     }
 
@@ -135,13 +158,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
