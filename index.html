@@ -75,15 +75,17 @@
         const marker = new google.maps.Marker({
           position: { lat, lng },
           map,
-          title: hogar.nombre_residencia || ''
+          title: hogar.nombre_residencia || '',
+          icon: null // Ícono rojo default
         });
 
         marker.addListener('click', () => {
-          // ✅ Solo 1 marcador resaltado a la vez
-          if (selectedMarker) {
-            selectedMarker.setIcon(null); // Reset al ícono original
+          // 🔄 Restaurar anterior
+          if (selectedMarker && selectedMarker !== marker) {
+            selectedMarker.setIcon(null);
           }
 
+          // 🎨 Pintar nuevo marcador seleccionado
           marker.setIcon({
             path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
             scale: 5,
