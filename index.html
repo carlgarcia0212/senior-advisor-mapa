@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mapa Senior Advisor - Silencioso</title>
+  <title>Mapa Senior Advisor - Color al Clic</title>
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
@@ -76,20 +76,34 @@
           position: { lat, lng },
           map,
           title: hogar.nombre_residencia || '',
-          icon: null // Ícono rojo default
+          icon: {
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 5,
+            fillColor: '#d60000', // rojo personalizado
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2
+          }
         });
 
         marker.addListener('click', () => {
-          // 🔄 Restaurar anterior
+          // resetear el anterior
           if (selectedMarker && selectedMarker !== marker) {
-            selectedMarker.setIcon(null);
+            selectedMarker.setIcon({
+              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              scale: 5,
+              fillColor: '#d60000', // rojo
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2
+            });
           }
 
-          // 🎨 Pintar nuevo marcador seleccionado
+          // pintar este
           marker.setIcon({
             path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
             scale: 5,
-            fillColor: '#00e7ff',
+            fillColor: '#00e7ff', // tu color pedido
             fillOpacity: 1,
             strokeColor: '#ffffff',
             strokeWeight: 2
