@@ -8,18 +8,15 @@
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
   </style>
-  <!-- Usa la misma API key que ya tienes -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"></script>
 </head>
 <body>
   <div id="map"></div>
 
   <script>
-    // --- CONFIG (ajusta si cambian IDs / API keys) ---
     const JSON_URL = "https://carlgarcia0212.github.io/senior-advisor-mapa/residencias.json";
     const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
     const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
-    // --------------------------------------------------
 
     function toNum(v) {
       const n = (typeof v === 'number') ? v : parseFloat(v);
@@ -41,14 +38,14 @@
       });
     }
 
+    let selectedMarker = null;
+
     async function initMap() {
-      // Inicializa mapa
       const map = new google.maps.Map(document.getElementById('map'), {
         center: { lat: -33.45, lng: -70.65 },
         zoom: 12
       });
 
-      // Intentar geoloc (silencioso)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -61,18 +58,15 @@
         );
       }
 
-      // Carga residencias JSON
       let hogares = [];
       try {
         const resp = await fetch(JSON_URL, { cache: 'no-store' });
-        if (!resp.ok) return; // silencioso
+        if (!resp.ok) return;
         hogares = await resp.json();
       } catch (e) {
-        // silencioso
         return;
       }
 
-      // Coloca markers. Al click -> guardar silencioso evitando duplicados
       hogares.forEach(hogar => {
         const lat = toNum(hogar.latitud_google);
         const lng = toNum(hogar.longitud_google);
@@ -85,14 +79,27 @@
         });
 
         marker.addListener('click', () => {
+          // ✅ Solo 1 marcador resaltado a la vez
+          if (selectedMarker) {
+            selectedMarker.setIcon(null); // Reset al ícono original
+          }
+
+          marker.setIcon({
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 5,
+            fillColor: '#00e7ff',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2
+          });
+
+          selectedMarker = marker;
+
           guardarSeleccionSinDup(hogar);
         });
       });
     }
 
-    // ---------- Guardado silencioso evitando duplicados ----------
-    // Estrategia: GET lista actual, comprobar si existe place_id, si no -> POST
-    // Nota: para colecciones grandes esta comprobación debería paginar; aquí asumo tamaño manejable
     async function guardarSeleccionSinDup(hogar) {
       const placeId = hogar.place_id || "";
       if (!placeId) return;
@@ -105,8 +112,6 @@
       };
 
       try {
-        // 1) Obtener lista actual (GET)
-        // Añadimos un query param para reducir riesgo de cache: timestamp
         const listResp = await fetch(ADALO_API_URL + "?_t=" + Date.now(), {
           method: "GET",
           headers: {
@@ -115,16 +120,12 @@
           }
         });
 
-        if (!listResp.ok) {
-          // Si GET falla, no hacemos nada (silencioso)
-          return;
-        }
+        if (!listResp.ok) return;
 
         const listText = await listResp.text();
         let items = [];
         try {
           const parsed = JSON.parse(listText);
-          // Adalo a veces devuelve [] o { records: [...] } dependiendo del conector
           if (Array.isArray(parsed)) items = parsed;
           else if (parsed && Array.isArray(parsed.records)) items = parsed.records;
           else if (parsed && Array.isArray(parsed.data)) items = parsed.data;
@@ -133,18 +134,13 @@
           items = [];
         }
 
-        // 2) Chequear existencia
         const exists = items.some(it => {
           const p = (it && it.place_id) ? String(it.place_id) : "";
           return p === String(placeId);
         });
 
-        if (exists) {
-          // No guardar duplicado (silencioso)
-          return;
-        }
+        if (exists) return;
 
-        // 3) Hacer POST para guardar nuevo registro
         await fetch(ADALO_API_URL, {
           method: "POST",
           headers: {
@@ -154,14 +150,11 @@
           body: JSON.stringify(payload)
         });
 
-        // silencioso: no alerts
       } catch (err) {
-        // silencioso: ignorar errores
+        // silencioso
       }
     }
-    // ---------------------------------------------------------------
 
-    // Iniciar
     window.onload = initMap;
   </script>
 </body>
