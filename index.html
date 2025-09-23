@@ -50,6 +50,7 @@
         zoom: 12
       });
 
+      // ubicación actual (si está disponible)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -65,10 +66,10 @@
         );
       }
 
+      // cargar residencias
       try {
         const resp = await fetch(JSON_URL, { cache: 'no-store' });
         if (!resp.ok) return;
-
         const hogares = await resp.json();
         hogares.forEach(hogar => {
           const lat = toNum(hogar.latitud_google);
@@ -81,25 +82,14 @@
             title: hogar.nombre_residencia || ''
           });
 
-          marker.addListener('click', () => {
-            // CAMBIO DE COLOR AL HACER CLICK
-            marker.setIcon({
-              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-              scale: 5,
-              fillColor: '#00e7ff',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2
-            });
-
-            guardarSeleccionSilenciosa(hogar);
-          });
+          marker.addListener('click', () => guardarSeleccionSilenciosa(hogar));
         });
       } catch (e) {
-        // silencioso
+        // sin mensajes
       }
     }
 
+    // Guardar automático sin mostrar mensajes
     async function guardarSeleccionSilenciosa(hogar) {
       const payload = {
         place_id: hogar.place_id || "",
@@ -117,8 +107,9 @@
           },
           body: JSON.stringify(payload)
         });
+        // nada de alerts ni logs
       } catch (err) {
-        // silencioso
+        // nada de alerts ni logs
       }
     }
 
