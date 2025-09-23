@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mapa Senior Advisor - Simple y Rápido</title>
+  <title>Mapa Senior Advisor - Place ID</title>
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
   </style>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"></script>
+  <!-- Asegúrate de tener habilitada la Places API en tu consola -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc&libraries=places"></script>
 </head>
 <body>
   <div id="map"></div>
@@ -18,26 +19,6 @@
     const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
     const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
 
-    function toNum(v) {
-      const n = (typeof v === 'number') ? v : parseFloat(v);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    function addUserDot(map, pos) {
-      new google.maps.Marker({
-        position: pos,
-        map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 6,
-          fillColor: '#1a73e8',
-          fillOpacity: 1,
-          strokeColor: '#fff',
-          strokeWeight: 2
-        }
-      });
-    }
-
     let selectedMarker = null;
 
     async function initMap() {
@@ -46,11 +27,23 @@
         zoom: 12
       });
 
+      // Posición del usuario (opcional)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            addUserDot(map, userPos);
+            new google.maps.Marker({
+              position: userPos,
+              map,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: '#1a73e8',
+                fillOpacity: 1,
+                strokeColor: '#fff',
+                strokeWeight: 2
+              }
+            });
             map.setCenter(userPos);
           },
           () => {},
@@ -64,59 +57,64 @@
         if (!resp.ok) return;
         hogares = await resp.json();
       } catch (e) {
+        console.error("Error cargando JSON", e);
         return;
       }
 
+      const service = new google.maps.places.PlacesService(map);
+
       hogares.forEach(hogar => {
-        const lat = toNum(hogar.latitud_google);
-        const lng = toNum(hogar.longitud_google);
-        if (lat === null || lng === null) return;
+        const placeId = hogar.place_id;
+        if (!placeId) return;
 
-        const marker = new google.maps.Marker({
-          position: { lat, lng },
-          map,
-          title: hogar.nombre_residencia || '',
-          icon: {
-            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-            scale: 5,
-            fillColor: '#d60000',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2
-          }
-        });
+        service.getDetails({ placeId }, (place, status) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !place.geometry) return;
 
-        marker.addListener('click', () => {
-          // 🔄 Marcar visualmente
-          if (selectedMarker && selectedMarker !== marker) {
-            selectedMarker.setIcon({
+          const marker = new google.maps.Marker({
+            position: place.geometry.location,
+            map,
+            title: hogar.nombre_residencia || '',
+            icon: {
               path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
               scale: 5,
               fillColor: '#d60000',
               fillOpacity: 1,
               strokeColor: '#ffffff',
               strokeWeight: 2
-            });
-          }
-
-          marker.setIcon({
-            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-            scale: 5,
-            fillColor: '#00e7ff', // ✅ color solicitado
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2
+            }
           });
 
-          selectedMarker = marker;
+          marker.addListener('click', () => {
+            // Cambiar color visual
+            if (selectedMarker && selectedMarker !== marker) {
+              selectedMarker.setIcon({
+                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+                scale: 5,
+                fillColor: '#d60000',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+              });
+            }
 
-          // 📤 Guardar en segundo plano sin validación
-          guardarSimple(hogar);
+            marker.setIcon({
+              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              scale: 5,
+              fillColor: '#00e7ff',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2
+            });
+
+            selectedMarker = marker;
+
+            // Enviar a Adalo
+            guardarSimple(hogar);
+          });
         });
       });
     }
 
-    // 💨 Guardado sin validación
     async function guardarSimple(hogar) {
       const payload = {
         place_id: hogar.place_id || "",
@@ -135,7 +133,7 @@
           body: JSON.stringify(payload)
         });
       } catch (err) {
-        // silencioso
+        console.warn("Error al guardar en Adalo", err);
       }
     }
 
