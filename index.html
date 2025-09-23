@@ -50,7 +50,6 @@
         zoom: 12
       });
 
-      // Mostrar ubicación actual
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -65,8 +64,6 @@
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
         );
       }
-
-      let selectedMarker = null; // Solo un marcador resaltado a la vez
 
       try {
         const resp = await fetch(JSON_URL, { cache: 'no-store' });
@@ -85,12 +82,7 @@
           });
 
           marker.addListener('click', () => {
-            // Restaurar marcador anterior
-            if (selectedMarker) {
-              selectedMarker.setIcon(null);
-            }
-
-            // Marcar este como seleccionado
+            // CAMBIO DE COLOR AL HACER CLICK
             marker.setIcon({
               path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
               scale: 5,
@@ -100,12 +92,11 @@
               strokeWeight: 2
             });
 
-            selectedMarker = marker;
             guardarSeleccionSilenciosa(hogar);
           });
         });
       } catch (e) {
-        // no mostrar error
+        // silencioso
       }
     }
 
