@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -23,23 +22,13 @@
   <div id="debug">Cargando mapa...</div>
 
   <script>
-    const API_ADALO = "https://api.adalo.com/v0/apps/6sf063he4vxtqvsamoica6tbt"; // Cambia si usas otro
-    const COLLECTION_NAME = "residencias_clicks"; // Asegúrate que este sea el nombre correcto en Adalo
-    const TOKEN_ADALO = "Bearer 08873f5270dbb3cfb7c5e7a55e5286be49cbf6f285b9d6c376ea66d6b95e4db7"; // Tu token de API
+    const API_ADALO = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c";
+    const COLLECTION_NAME = "t_7slnxztk4hwnn9l2wtk2hxw0y"; // ID real de tu colección
+    const TOKEN_ADALO = "Bearer 6sf063he4vxtqvsamoica6tbt";
 
     const lugares = [
-      {
-        nombre: "Residencia Las Rosas",
-        lat: -33.45694,
-        lng: -70.64827,
-        place_id: "residencia_las_rosas"
-      },
-      {
-        nombre: "Residencia Santa María",
-        lat: -33.45789,
-        lng: -70.64671,
-        place_id: "residencia_santa_maria"
-      }
+      { nombre: "Residencia Las Rosas", lat: -33.45694, lng: -70.64827, place_id: "residencia_las_rosas" },
+      { nombre: "Residencia Santa María", lat: -33.45789, lng: -70.64671, place_id: "residencia_santa_maria" }
     ];
 
     const debug = (msg) => {
@@ -50,13 +39,11 @@
 
     const obtenerUsuario = async (userId) => {
       debug("Buscando username...");
-      const res = await fetch(\`\${API_ADALO}/users/\${userId}\`, {
-        headers: {
-          Authorization: TOKEN_ADALO
-        }
+      const res = await fetch(`${API_ADALO}/collections/users/${userId}`, {
+        headers: { Authorization: TOKEN_ADALO }
       });
       const data = await res.json();
-      debug("Usuario detectado: " + data.username);
+      debug("Usuario detectado: " + (data.username || "sin username"));
       return data.username;
     };
 
@@ -64,10 +51,11 @@
       const body = {
         place_id: residencia.place_id,
         nombre_residencia: residencia.nombre,
-        username_logueado: username
+        username_logueado: username,
+        timestamp: new Date().toISOString()
       };
 
-      const res = await fetch(\`\${API_ADALO}/collections/\${COLLECTION_NAME}\`, {
+      const res = await fetch(`${API_ADALO}/collections/${COLLECTION_NAME}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -118,15 +106,21 @@
           guardarSeleccion(residencia, username);
         });
       });
+
+      debug("🟢 Mapa inicializado.");
     };
+
+    // Forzar inicio del mapa
+    window.onload = iniciarMapa;
   </script>
 
   <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD6g1eCBYUyhPWB_BbCeAwZGR9lvLUzSwg&callback=iniciarMapa"
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"
     async
     defer
   ></script>
 </body>
 </html>
+
 
 
