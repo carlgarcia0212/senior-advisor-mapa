@@ -1,141 +1,104 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mapa Senior Advisor</title>
-  <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-    #map {
-      width: 100%;
-      height: 100vh;
-    }
-  </style>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc"></script>
-</head>
-<body>
-  <div id="map"></div>
-  <script>
-    const JSON_URL = "https://carlgarcia0212.github.io/senior-advisor-mapa/residencias.json";
-    const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
-    const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
+<script>
+const JSON_URL = "https://carlgarcia0212.github.io/senior-advisor-mapa/residencias.json";
+const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
+const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
 
-    function toNum(v) {
-      const n = (typeof v === 'number') ? v : parseFloat(v);
-      return Number.isFinite(n) ? n : null;
-    }
+function toNum(v) {
+  const n = (typeof v === 'number') ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+}
 
-    function addUserDot(map, pos) {
-      new google.maps.Marker({
-        position: pos,
+function addUserDot(map, pos) {
+  new google.maps.Marker({
+    position: pos,
+    map,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 6,
+      fillColor: '#1a73e8',
+      fillOpacity: 1,
+      strokeColor: '#fff',
+      strokeWeight: 2
+    }
+  });
+}
+
+async function initMap() {
+  let map = new google.maps.Map(document.getElementById('map'), {
+    center: { lat: -33.45, lng: -70.65 },
+    zoom: 12
+  });
+
+  // ubicación actual (si está disponible)
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const userPos = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+        addUserDot(map, userPos);
+        map.setCenter(userPos);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+    );
+  }
+
+  // cargar residencias
+  try {
+    const resp = await fetch(JSON_URL, { cache: 'no-store' });
+    if (!resp.ok) return;
+    const hogares = await resp.json();
+    hogares.forEach(hogar => {
+      const lat = toNum(hogar.latitud_google);
+      const lng = toNum(hogar.longitud_google);
+      if (lat === null || lng === null) return;
+
+      const marker = new google.maps.Marker({
+        position: { lat, lng },
         map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 6,
-          fillColor: '#1a73e8',
+        title: hogar.nombre_residencia || ''
+      });
+
+      marker.addListener('click', () => {
+        marker.setIcon({
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale: 5,
+          fillColor: '#00e7ff',
           fillOpacity: 1,
-          strokeColor: '#fff',
+          strokeColor: '#ffffff',
           strokeWeight: 2
-        }
-      });
-    }
-
-    async function initMap() {
-      const map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: -33.45, lng: -70.65 },
-        zoom: 12
-      });
-
-      // ubicación actual
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const userPos = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude
-            };
-            addUserDot(map, userPos);
-            map.setCenter(userPos);
-          },
-          () => {},
-          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-        );
-      }
-
-      // cargar residencias
-      try {
-        const resp = await fetch(JSON_URL, { cache: 'no-store' });
-        if (!resp.ok) return;
-        const hogares = await resp.json();
-
-        hogares.forEach(hogar => {
-          const lat = toNum(hogar.latitud_google);
-          const lng = toNum(hogar.longitud_google);
-          if (lat === null || lng === null) return;
-
-          const marker = new google.maps.Marker({
-            position: { lat, lng },
-            map,
-            title: hogar.nombre_residencia || '',
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 6,
-              fillColor: "#e74c3c",  // 🔴 color por defecto
-              fillOpacity: 1,
-              strokeColor: "#fff",
-              strokeWeight: 1
-            }
-          });
-
-          marker.addListener('click', () => {
-            marker.setIcon({
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: "#00e7ff",  // 💙 color al seleccionar
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 2
-            });
-
-            guardarSeleccionSilenciosa(hogar);
-          });
         });
+        guardarSeleccionSilenciosa(hogar);
+      });
+    });
+  } catch (e) {
+    // sin mensajes
+  }
+}
 
-      } catch (e) {
-        // silencioso
-      }
-    }
+// Guardar automático sin mostrar mensajes
+async function guardarSeleccionSilenciosa(hogar) {
+  const payload = {
+    place_id: hogar.place_id || "",
+    nombre_residencia: hogar.nombre_residencia || "",
+    comuna: hogar.comuna || "",
+    imagen_url: hogar.imagen_1 || ""
+  };
+  try {
+    await fetch(ADALO_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + ADALO_BEARER,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    // sin mensajes
+  }
+}
 
-    async function guardarSeleccionSilenciosa(hogar) {
-      const payload = {
-        place_id: hogar.place_id || "",
-        nombre_residencia: hogar.nombre_residencia || "",
-        comuna: hogar.comuna || "",
-        imagen_url: hogar.imagen_1 || ""
-      };
-      try {
-        await fetch(ADALO_API_URL, {
-          method: "POST",
-          headers: {
-            "Authorization": "Bearer " + ADALO_BEARER,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) {
-        // silencioso
-      }
-    }
-
-    window.onload = initMap;
-  </script>
-</body>
-</html>
-
-
-
-
+window.onload = initMap;
+</script>
