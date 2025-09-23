@@ -8,7 +8,7 @@
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
   </style>
-  <!-- Asegúrate de tener habilitada la Places API en tu consola -->
+  <!-- Google Maps con Places API -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkpdcq_Ul2DD_sKqgCXr0Cg9TRVwU12Zc&libraries=places"></script>
 </head>
 <body>
@@ -27,7 +27,7 @@
         zoom: 12
       });
 
-      // Posición del usuario (opcional)
+      // Ubicación del usuario (opcional)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -51,13 +51,14 @@
         );
       }
 
+      // Cargar JSON
       let hogares = [];
       try {
         const resp = await fetch(JSON_URL, { cache: 'no-store' });
-        if (!resp.ok) return;
+        if (!resp.ok) throw new Error("No se pudo cargar el JSON");
         hogares = await resp.json();
       } catch (e) {
-        console.error("Error cargando JSON", e);
+        console.error("Error cargando JSON:", e);
         return;
       }
 
@@ -67,8 +68,14 @@
         const placeId = hogar.place_id;
         if (!placeId) return;
 
-        service.getDetails({ placeId }, (place, status) => {
-          if (status !== google.maps.places.PlacesServiceStatus.OK || !place.geometry) return;
+        service.getDetails({
+          placeId: placeId,
+          fields: ['name', 'geometry']  // 👈 clave: pedir explícitamente los campos
+        }, (place, status) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !place.geometry) {
+            console.warn("No se pudo obtener info de:", placeId, status);
+            return;
+          }
 
           const marker = new google.maps.Marker({
             position: place.geometry.location,
@@ -85,7 +92,6 @@
           });
 
           marker.addListener('click', () => {
-            // Cambiar color visual
             if (selectedMarker && selectedMarker !== marker) {
               selectedMarker.setIcon({
                 path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
@@ -107,8 +113,6 @@
             });
 
             selectedMarker = marker;
-
-            // Enviar a Adalo
             guardarSimple(hogar);
           });
         });
