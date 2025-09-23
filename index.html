@@ -18,6 +18,14 @@
     const ADALO_API_URL = "https://api.adalo.com/v0/apps/46b15754-5dde-409c-a825-90185f48da2c/collections/t_7slnxztk4hwnn9l2wtk2hxw0y";
     const ADALO_BEARER = "6sf063he4vxtqvsamoica6tbt";
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get("username");
+
+    if (!username) {
+      alert("No estás logueado. Debes acceder desde la app.");
+      throw new Error("Username no disponible");
+    }
+
     function toNum(v) {
       const n = (typeof v === 'number') ? v : parseFloat(v);
       return Number.isFinite(n) ? n : null;
@@ -44,7 +52,6 @@
         zoom: 12
       });
 
-      // ubicación actual (si está disponible)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -52,12 +59,11 @@
             addUserDot(map, userPos);
             map.setCenter(userPos);
           },
-          () => {}, // silencioso
+          () => {},
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
         );
       }
 
-      // cargar residencias
       try {
         const resp = await fetch(JSON_URL, { cache: 'no-store' });
         if (!resp.ok) return;
@@ -77,12 +83,10 @@
           });
 
           marker.addListener('click', () => {
-            // Restaurar marcador anterior
             if (marcadorSeleccionado) {
               marcadorSeleccionado.setIcon(null);
             }
 
-            // Cambiar color del marcador seleccionado
             marker.setIcon({
               path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
               scale: 5,
@@ -94,21 +98,22 @@
 
             marcadorSeleccionado = marker;
 
-            guardarSeleccionSilenciosa(hogar);
+            guardarSeleccion(hogar);
           });
         });
       } catch (e) {
-        // sin mensajes
+        // silencioso
       }
     }
 
-    // Guardar automático sin mostrar mensajes
-    async function guardarSeleccionSilenciosa(hogar) {
+    async function guardarSeleccion(hogar) {
       const payload = {
         place_id: hogar.place_id || "",
         nombre_residencia: hogar.nombre_residencia || "",
         comuna: hogar.comuna || "",
-        imagen_url: hogar.imagen_1 || ""
+        imagen_url: hogar.imagen_1 || "",
+        username_logueado: username,
+        timestamp: new Date().toISOString()
       };
 
       try {
@@ -120,8 +125,9 @@
           },
           body: JSON.stringify(payload)
         });
+        console.log("Guardado:", payload);
       } catch (err) {
-        // silencioso
+        console.error("Error al guardar:", err);
       }
     }
 
@@ -129,6 +135,7 @@
   </script>
 </body>
 </html>
+
 
 
 
